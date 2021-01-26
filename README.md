@@ -1,5 +1,7 @@
 # gpio_press_count
 
+:warning: This is just an experiment. Things like this should ideally be made in kernel space.
+
 ## About
 
 Just a simple C Linux application that can be used to detect sequences of edges
