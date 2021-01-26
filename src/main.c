@@ -164,7 +164,8 @@ static coroutine void debouncer(int ch, uint32_t gpio_num, const char *name, uin
             fdclean(req.fd);
         }
     }
-    LOG(WARN, "Exiting main loop");
+    LOG(WARN, "Exiting");
+    chdone(ch);
     close(fd);
 }
 
@@ -212,12 +213,13 @@ static coroutine void counter(int in_ch, int out_ch, uint32_t gpio_num, const ch
             }
         }
     }
-    LOG(WARN, "Exiting main loop");
+    LOG(WARN, "Exiting");
+    chdone(out_ch);
 }
 
 int main(int argc, char *argv[])
 {
-    int ret = 0;
+    int ret, exit_code = 0;
     bool is_running = true;
     int chan1[2];
     int chan2[2];
@@ -228,14 +230,14 @@ int main(int argc, char *argv[])
     if (argc < 3)
     {
         LOG(ERROR, "Please provide at least two arguments");
-        exit(1);
+        exit(exit_code);
     }
 
     gpio_num = strtoul(argv[1], NULL, 0);
     if (gpio_num == 0)
     {
         LOG(ERROR, "Wrong GPIO number - %s", argv[1]);
-        exit(1);
+        exit(exit_code);
     }
 
     for (int i = 0; i < argc - 2; i++)
@@ -244,7 +246,7 @@ int main(int argc, char *argv[])
         if (ret == 0)
         {
             LOG(ERROR, "Wrong count - %s", argv[i + 2]);
-            exit(1);
+            exit(exit_code);
         }
         counts[i] = ret;
     }
@@ -269,7 +271,10 @@ int main(int argc, char *argv[])
     {
         int i;
         ret = chrecv(chan2[1], &s, sizeof(s), -1);
-        errno_assert(ret == 0);
+        if (ret != 0)
+        {
+            goto exit;
+        }
         LOG(DEBUG, "GPIO: %d count: %lu", s.num, s.count);
         assert(s.num == gpio_num);
 
@@ -285,7 +290,9 @@ int main(int argc, char *argv[])
         if (is_running == false)
         {
             LOG(INFO, "Recognized count number: %lu", s.count);
-            //TODO make this configurable
+            exit_code = s.count;
+
+            //TODO make this LED signaling configurable
             switch (i)
             {
             case 0:
@@ -304,6 +311,8 @@ int main(int argc, char *argv[])
         }
     }
 
+exit:
+    LOG(WARN, "Exiting");
     ret = hclose(h1);
     errno_assert(ret == 0);
 
@@ -320,5 +329,5 @@ int main(int argc, char *argv[])
     ret = hclose(chan1[0]);
     errno_assert(ret == 0);
 
-    exit(s.count);
+    exit(exit_code);
 }
